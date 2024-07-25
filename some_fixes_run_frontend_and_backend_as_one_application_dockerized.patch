@@ -1,0 +1,248 @@
+Subject: [PATCH] some fixes
+run frontend and backend as one application
+dockerized
+---
+Index: Implementierung/Backend/src/main/java/edu/kit/informatik/security/SecurityConfig.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Implementierung/Backend/src/main/java/edu/kit/informatik/security/SecurityConfig.java b/Implementierung/Backend/src/main/java/edu/kit/informatik/security/SecurityConfig.java
+--- a/Implementierung/Backend/src/main/java/edu/kit/informatik/security/SecurityConfig.java	(revision 4725b731d3e31005bf1f483ccbed0c3502be556d)
++++ b/Implementierung/Backend/src/main/java/edu/kit/informatik/security/SecurityConfig.java	(revision 1b10adefd51be4342d3c0fbca03feb80d753ef8d)
+@@ -17,7 +17,7 @@
+ import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+ import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+ import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource
+-                                                                                        .OAuth2ResourceServerConfigurer;
++        .OAuth2ResourceServerConfigurer;
+ import org.springframework.security.config.http.SessionCreationPolicy;
+ import org.springframework.security.core.userdetails.UserDetailsService;
+ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+@@ -49,6 +49,7 @@
+ 
+     /**
+      * Konstruktor zum Erstellen eines Objektes
++     *
+      * @param rsaKeys {@link RsaKeyProperties}
+      */
+     public SecurityConfig(RsaKeyProperties rsaKeys) {
+@@ -57,6 +58,7 @@
+ 
+     /**
+      * Erstellen eines {@link AuthenticationManager}
++     *
+      * @param userDetailsService {@link MyUserDetailsService}
+      * @return {@link AuthenticationManager}
+      */
+@@ -80,10 +82,11 @@
+     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+         return httpSecurity
+                 .csrf(AbstractHttpConfigurer::disable)
+-
+                 .authorizeHttpRequests(auth -> auth
+                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()//allow CORS option calls
+                         .requestMatchers("/api/user/login").permitAll()
++                        .requestMatchers("/*").permitAll()
++                        .requestMatchers("/assets/**").permitAll()
+                         .requestMatchers(HttpMethod.POST, "/api/user").permitAll()
+                         .requestMatchers("/api/user/admin").access(hasAuthority("SCOPE_ADMIN"))
+                         .anyRequest().authenticated())
+@@ -92,12 +95,13 @@
+                 .exceptionHandling((ex) -> ex
+                         .authenticationEntryPoint(new BearerTokenAuthenticationEntryPoint())
+                         .accessDeniedHandler(new BearerTokenAccessDeniedHandler())
+-                        )
++                )
+                 .build();
+     }
+ 
+     /**
+      * Dencodieren des {@link JwtAuthenticationToken}
++     *
+      * @return {@link JwtDecoder}
+      */
+     @Bean
+@@ -107,6 +111,7 @@
+ 
+     /**
+      * Encodieren des {@link JwtAuthenticationToken}
++     *
+      * @return {@link JwtEncoder}
+      */
+     @Bean
+@@ -119,6 +124,7 @@
+ 
+     /**
+      * PasswordEncoder zum Verschlüssel der Passwörter
++     *
+      * @return {@link BCryptPasswordEncoder}
+      */
+     @Bean
+Index: Implementierung/Backend/src/main/java/edu/kit/informatik/service/BaseService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Implementierung/Backend/src/main/java/edu/kit/informatik/service/BaseService.java b/Implementierung/Backend/src/main/java/edu/kit/informatik/service/BaseService.java
+--- a/Implementierung/Backend/src/main/java/edu/kit/informatik/service/BaseService.java	(revision 4725b731d3e31005bf1f483ccbed0c3502be556d)
++++ b/Implementierung/Backend/src/main/java/edu/kit/informatik/service/BaseService.java	(revision 59de3b44c887389f6fac09433591e055ac23744e)
+@@ -21,7 +21,6 @@
+  * @version 1.0
+  */
+ @Service
+-@EnableAutoConfiguration
+ public abstract class BaseService<Entity, ParameterDto, ReturnDto> {
+ 
+     private static final String ID_ATTRIBUTE = "userId";
+Index: Implementierung/Backend/src/main/java/edu/kit/informatik/service/CategoryService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Implementierung/Backend/src/main/java/edu/kit/informatik/service/CategoryService.java b/Implementierung/Backend/src/main/java/edu/kit/informatik/service/CategoryService.java
+--- a/Implementierung/Backend/src/main/java/edu/kit/informatik/service/CategoryService.java	(revision 4725b731d3e31005bf1f483ccbed0c3502be556d)
++++ b/Implementierung/Backend/src/main/java/edu/kit/informatik/service/CategoryService.java	(revision 59de3b44c887389f6fac09433591e055ac23744e)
+@@ -26,7 +26,6 @@
+  */
+ 
+ @Component
+-@EnableAutoConfiguration
+ public class CategoryService extends BaseService<Category, RatedCategoryDto, CategoryDto> {
+ 
+     private static final String ID_ATTRIBUTE = "userId";
+Index: Implementierung/Backend/src/main/java/edu/kit/informatik/service/UserService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Implementierung/Backend/src/main/java/edu/kit/informatik/service/UserService.java b/Implementierung/Backend/src/main/java/edu/kit/informatik/service/UserService.java
+--- a/Implementierung/Backend/src/main/java/edu/kit/informatik/service/UserService.java	(revision 4725b731d3e31005bf1f483ccbed0c3502be556d)
++++ b/Implementierung/Backend/src/main/java/edu/kit/informatik/service/UserService.java	(revision 59de3b44c887389f6fac09433591e055ac23744e)
+@@ -29,8 +29,11 @@
+ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.util.List;
++import java.util.Objects;
+ import java.util.Optional;
+ 
++import static java.util.Objects.nonNull;
++
+ /**
+  * Service für {@link User Benutzer}
+  *
+@@ -130,9 +133,6 @@
+         if (!newUser.getLastName().equals(repositoryUser.getLastName())) {
+             repositoryUser.setLastName(newUser.getLastName());
+         }
+-        if (!newUser.getPassword().equals(repositoryUser.getPassword())) {
+-            repositoryUser.setPassword(newUser.getPassword());
+-        }
+ 
+         return mapper.modelToDto(repositoryUser);
+     }
+Index: Implementierung/docker-compose.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Implementierung/docker-compose.yml b/Implementierung/docker-compose.yml
+new file mode 100644
+--- /dev/null	(revision 1b10adefd51be4342d3c0fbca03feb80d753ef8d)
++++ b/Implementierung/docker-compose.yml	(revision 1b10adefd51be4342d3c0fbca03feb80d753ef8d)
+@@ -0,0 +1,27 @@
++version: '3.8'
++services:
++  db:
++    image: mysql:8.0
++    environment:
++      MYSQL_DATABASE: classroom # The name of your database
++      MYSQL_USER: teacher # A user of your choosing
++      MYSQL_PASSWORD: oaibajnr4r3214 # A strong password for your user
++      MYSQL_ROOT_PASSWORD: 98345nsgiueq34 # A strong password for the root user
++    ports:
++      - "3306:3306" # Map port 3306 inside the container to port 3306 on your host
++    volumes:
++      - db-data:/var/lib/mysql # Persist database data
++    restart: always
++  app:
++    build:
++      context: .
++    ports:
++      - "8080:8080"
++    environment:
++      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/classroom
++      SPRING_DATASOURCE_USERNAME: teacher
++      SPRING_DATASOURCE_PASSWORD: oaibajnr4r3214
++    depends_on:
++      - db
++volumes:
++  db-data:
+Index: Implementierung/frontend/paschi/src/service/BaseService.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Implementierung/frontend/paschi/src/service/BaseService.ts b/Implementierung/frontend/paschi/src/service/BaseService.ts
+--- a/Implementierung/frontend/paschi/src/service/BaseService.ts	(revision 4725b731d3e31005bf1f483ccbed0c3502be556d)
++++ b/Implementierung/frontend/paschi/src/service/BaseService.ts	(revision 1b10adefd51be4342d3c0fbca03feb80d753ef8d)
+@@ -1,6 +1,6 @@
+ import {IModelDtoMapper} from "@/dto/mapper/IModelDtoMapper";
+ 
+-export const BASE_URL = "https://193.196.36.88";
++export const BASE_URL = window.location.protocol + '//' + window.location.host;
+ 
+ export abstract class BaseService<Entity, Dto> {
+ 
+Index: Implementierung/Dockerfile
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Implementierung/Dockerfile b/Implementierung/Dockerfile
+new file mode 100644
+--- /dev/null	(revision 6bc5a016523670e166ac868e99083a45edaf5c64)
++++ b/Implementierung/Dockerfile	(revision 6bc5a016523670e166ac868e99083a45edaf5c64)
+@@ -0,0 +1,34 @@
++FROM node:16.14.2 as frontend-build
++
++WORKDIR /app
++
++COPY frontend/paschi/package.json ./
++COPY frontend/paschi/yarn.lock ./
++
++RUN yarn install
++
++COPY frontend/paschi .
++
++ARG VITE_BACKEND_URL
++ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
++
++RUN npx vite build
++
++FROM maven:3.9.6-eclipse-temurin-17 as backend-build
++
++WORKDIR /app
++COPY Backend/pom.xml .
++COPY Backend/src src
++COPY --from=frontend-build /app/dist /app/src/main/resources/static
++
++RUN mvn clean package -DskipTests
++
++FROM eclipse-temurin:17.0.10_7-jre
++
++VOLUME /tmp
++
++EXPOSE 8080
++
++COPY --from=backend-build /app/target/*.jar app.jar
++
++ENTRYPOINT ["java","-jar","/app.jar"]
+\ No newline at end of file
+diff --git a/Implementierung/Backend/src/main/resources/application.properties.template b/Implementierung/Backend/src/main/resources/application.properties.template
+deleted file mode 100644
+index a7641217c041245a0b6945f0fd3692876e9e1f88..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
